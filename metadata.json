@@ -1,0 +1,6 @@
+{
+  "name": "Enterprise AI SQL Studio",
+  "description": "An enterprise-grade Text-to-SQL platform featuring multi-agent AI pipelines, guardrails, self-healing SQL, dialect translators, ER diagram mappers, and interactive charts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
