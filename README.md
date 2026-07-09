@@ -22,3 +22,9 @@ The platform prevents destructive operations, detects hallucinated tables and jo
 🌐 Multi-Database Support
 📦 REST API Integration
 
+🎯 Project Goals
+Democratize data access for non-technical users.
+Eliminate hallucinated SQL queries.
+Ensure secure database interactions.
+Deliver explainable AI-generated SQL.
+Build an enterprise-ready analytics platform.
