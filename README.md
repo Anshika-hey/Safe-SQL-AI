@@ -4,6 +4,9 @@ SafeSQL AI is an enterprise-ready AI platform that enables users to query relati
 Unlike conventional Text-to-SQL applications, SafeSQL AI employs a schema-aware Retrieval-Augmented Generation (RAG) pipeline, multi-agent validation, and hallucination detection to generate accurate SQL queries that are verified against the live database schema before execution.
 The platform prevents destructive operations, detects hallucinated tables and joins, explains every generated query, and provides secure analytics for non-technical users.
 
+## 🚀 Live Demo
+[safe-sql-ai.vercel.app](https://safe-sql-ai.vercel.app)
+
 ✨ Key Features
 🧠 Natural Language → SQL Generation
 🔍 Schema-Aware RAG Pipeline
