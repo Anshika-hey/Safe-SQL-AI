@@ -2,14 +2,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import alasql from "alasql";
 import { dbSchemas, DatabaseSchema } from "./dbSchema.js";
 
-// Initialize Gemini Client
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
+  httpOptions: { headers: { "User-Agent": "aistudio-build" } },
 });
 
 export interface AgentLog {
@@ -28,28 +23,10 @@ export interface PipelineResult {
   wasHealed: boolean;
   healingAttempts: number;
   confidenceScore: number;
-  explanation: {
-    businessSummary: string;
-    steps: string[];
-    technicalDetails: string;
-  };
-  security: {
-    isSafe: boolean;
-    detectedRisks: string[];
-    userRole: string;
-    appliedGuardrails: string[];
-  };
-  optimization: {
-    estimatedCost: "Low" | "Medium" | "High";
-    indexRecommendations: string[];
-    improvements: string[];
-  };
-  visualization: {
-    chartType: "bar" | "line" | "pie" | "metric" | "table";
-    xAxisKey?: string;
-    yAxisKey?: string;
-    title: string;
-  };
+  explanation: { businessSummary: string; steps: string[]; technicalDetails: string; };
+  security: { isSafe: boolean; detectedRisks: string[]; userRole: string; appliedGuardrails: string[]; };
+  optimization: { estimatedCost: "Low" | "Medium" | "High"; indexRecommendations: string[]; improvements: string[]; };
+  visualization: { chartType: "bar" | "line" | "pie" | "metric" | "table"; xAxisKey?: string; yAxisKey?: string; title: string; };
   logs: AgentLog[];
 }
 
@@ -84,9 +61,7 @@ export async function runMultiAgentSqlPipeline(
   };
 
   const schema = dbSchemas.find((s) => s.id === schemaId);
-  if (!schema) {
-    throw new Error(`Invalid schema database ID: ${schemaId}`);
-  }
+  if (!schema) throw new Error(`Invalid schema database ID: ${schemaId}`);
 
   const schemaContext = schema.tables
     .map((table) => {
@@ -104,7 +79,7 @@ export async function runMultiAgentSqlPipeline(
 
   addLog("Generator Agent", "success", "Analyzing natural language prompt against schema relationships...");
 
-  let generatorPrompt = `You are a specialized Database SQL Generator Agent in an enterprise Text-to-SQL platform.
+  const generatorPrompt = `You are a specialized Database SQL Generator Agent in an enterprise Text-to-SQL platform.
 Your task is to write a single SELECT query using standard SQL that accurately solves the user's natural language request.
 
 === DATABASE SCHEMA CONTEXT ===
@@ -150,8 +125,7 @@ User Question: "${prompt}"`;
       }
     });
 
-    const generatorResponseText = response.text || "{}";
-    const data = JSON.parse(generatorResponseText);
+    const data = JSON.parse(response.text || "{}");
     sql = data.sql;
     confidenceScore = data.confidenceScore || 0.8;
     assumptions = data.assumptions || [];
@@ -171,9 +145,7 @@ User Question: "${prompt}"`;
 
   dangerousKeywords.forEach((kw) => {
     const rx = new RegExp(`\\b${kw}\\b`);
-    if (rx.test(upperSql)) {
-      detectedDangerous.push(kw);
-    }
+    if (rx.test(upperSql)) detectedDangerous.push(kw);
   });
 
   let isSafe = true;
@@ -266,8 +238,9 @@ ${execResult.error}
   }
 
   addLog("Optimizer Agent", "success", "Evaluating execution plans, table scan structures, and index utilization...");
+  addLog("Explainer Agent", "success", "Synthesizing plain English descriptions and dynamic visualization recommendations...");
 
-  let optimizerPrompt = `You are a database Performance Tuning Optimizer Agent. 
+  const optimizerPrompt = `You are a database Performance Tuning Optimizer Agent. 
 Analyze the following query running on the given schema, estimate cost profiles, and recommend indexes or improvements.
 
 === DATABASE SCHEMA ===
@@ -290,40 +263,7 @@ Return in JSON format:
   "improvements": ["specific performance rewrite tips or join comments"]
 }`;
 
-  let estimatedCost: "Low" | "Medium" | "High" = "Low";
-  let indexRecommendations: string[] = [];
-  let improvements: string[] = [];
-
-  try {
-    const optRes = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: optimizerPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            estimatedCost: { type: Type.STRING },
-            indexRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            improvements: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["estimatedCost", "indexRecommendations", "improvements"]
-        }
-      }
-    });
-
-    const optData = JSON.parse(optRes.text || "{}");
-    estimatedCost = optData.estimatedCost || "Low";
-    indexRecommendations = optData.indexRecommendations || [];
-    improvements = optData.improvements || [];
-    addLog("Optimizer Agent", "success", `Query tuning completed. Cost model: ${estimatedCost}. Index suggestions generated.`, { estimatedCost, indexRecommendations });
-  } catch (err: any) {
-    addLog("Optimizer Agent", "warning", `Tuning analysis skipped: ${err.message}`);
-  }
-
-  addLog("Explainer Agent", "success", "Synthesizing plain English descriptions and dynamic visualization recommendations...");
-
-  let explainerPrompt = `You are an Explainer and Visualization Advisor Agent in an analytics dashboard.
+  const explainerPrompt = `You are an Explainer and Visualization Advisor Agent in an analytics dashboard.
 Explain the following SQL query and suggest a visualization dashboard layout for its result set.
 
 === QUERY ===
@@ -357,6 +297,9 @@ Return in JSON format:
   "chartTitle": "Descriptive title for the chart"
 }`;
 
+  let estimatedCost: "Low" | "Medium" | "High" = "Low";
+  let indexRecommendations: string[] = [];
+  let improvements: string[] = [];
   let businessSummary = "Retrieves information from the database.";
   let steps: string[] = ["Reads table rows.", "Selects column projection fields."];
   let technicalDetails = "Standard query projections.";
@@ -365,8 +308,24 @@ Return in JSON format:
   let yAxisKey = "";
   let chartTitle = "Query Analysis Results";
 
-  try {
-    const expRes = await ai.models.generateContent({
+  const [optimizerSettled, explainerSettled] = await Promise.allSettled([
+    ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: optimizerPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            estimatedCost: { type: Type.STRING },
+            indexRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["estimatedCost", "indexRecommendations", "improvements"]
+        }
+      }
+    }),
+    ai.models.generateContent({
       model: "gemini-3.5-flash",
       contents: explainerPrompt,
       config: {
@@ -385,19 +344,39 @@ Return in JSON format:
           required: ["businessSummary", "steps", "technicalDetails", "chartType", "chartTitle"]
         }
       }
-    });
+    })
+  ]);
 
-    const expData = JSON.parse(expRes.text || "{}");
-    businessSummary = expData.businessSummary || businessSummary;
-    steps = expData.steps || steps;
-    technicalDetails = expData.technicalDetails || technicalDetails;
-    chartType = expData.chartType || "table";
-    xAxisKey = expData.xAxisKey || "";
-    yAxisKey = expData.yAxisKey || "";
-    chartTitle = expData.chartTitle || chartTitle;
-    addLog("Explainer Agent", "success", `Plain English translation prepared. Suggested chart layout: ${chartType}.`);
-  } catch (err: any) {
-    addLog("Explainer Agent", "warning", `Plain English formulation skipped: ${err.message}`);
+  if (optimizerSettled.status === "fulfilled") {
+    try {
+      const optData = JSON.parse(optimizerSettled.value.text || "{}");
+      estimatedCost = optData.estimatedCost || "Low";
+      indexRecommendations = optData.indexRecommendations || [];
+      improvements = optData.improvements || [];
+      addLog("Optimizer Agent", "success", `Query tuning completed. Cost model: ${estimatedCost}. Index suggestions generated.`, { estimatedCost, indexRecommendations });
+    } catch (err: any) {
+      addLog("Optimizer Agent", "warning", `Tuning analysis skipped: ${err.message}`);
+    }
+  } else {
+    addLog("Optimizer Agent", "warning", `Tuning analysis skipped: ${optimizerSettled.reason}`);
+  }
+
+  if (explainerSettled.status === "fulfilled") {
+    try {
+      const expData = JSON.parse(explainerSettled.value.text || "{}");
+      businessSummary = expData.businessSummary || businessSummary;
+      steps = expData.steps || steps;
+      technicalDetails = expData.technicalDetails || technicalDetails;
+      chartType = expData.chartType || "table";
+      xAxisKey = expData.xAxisKey || "";
+      yAxisKey = expData.yAxisKey || "";
+      chartTitle = expData.chartTitle || chartTitle;
+      addLog("Explainer Agent", "success", `Plain English translation prepared. Suggested chart layout: ${chartType}.`);
+    } catch (err: any) {
+      addLog("Explainer Agent", "warning", `Plain English formulation skipped: ${err.message}`);
+    }
+  } else {
+    addLog("Explainer Agent", "warning", `Plain English formulation skipped: ${explainerSettled.reason}`);
   }
 
   return {
